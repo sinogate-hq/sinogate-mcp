@@ -21,6 +21,25 @@
     "build": "tsc -p tsconfig.json",
     "prepack": "npm run build"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sinogate-hq/sinogate-mcp.git"
+  },
+  "homepage": "https://sinogate.ai",
+  "bugs": {
+    "url": "https://github.com/sinogate-hq/sinogate-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "sinogate",
+    "openai-compatible",
+    "llm",
+    "deepseek",
+    "qwen",
+    "kimi"
+  ],
+  "author": "SinoGate <contact@sinogate.ai>",
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
     "zod": "^4.0.0"

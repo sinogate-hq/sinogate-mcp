@@ -1,27 +1,27 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "ai.sinogate/mcp",
-  "title": "SinoGate MCP Server",
-  "description": "Use Chinese LLMs through the SinoGate OpenAI-compatible API.",
-  "version": "0.1.0",
-  "websiteUrl": "https://sinogate.ai/docs/models-pricing",
-  "packages": [
-    {
-      "registryType": "npm",
-      "identifier": "@sinogate/mcp",
-      "version": "0.1.0",
-      "transport": {
-        "type": "stdio"
-      },
-      "environmentVariables": [
-        {
-          "name": "SINOGATE_API_KEY",
-          "description": "Your SinoGate API key. Chat and comparison calls are billed to this account.",
-          "isRequired": true,
-          "isSecret": true,
-          "format": "string"
-        }
-      ]
-    }
-  ]
+    "$schema":  "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    "name":  "ai.sinogate/mcp",
+    "title":  "SinoGate MCP Server",
+    "description":  "Use Chinese LLMs through the SinoGate OpenAI-compatible API.",
+    "version":  "0.1.0",
+    "websiteUrl":  "https://sinogate.ai",
+    "packages":  [
+                     {
+                         "registryType":  "npm",
+                         "identifier":  "@sinogate/mcp",
+                         "version":  "0.1.0",
+                         "transport":  {
+                                           "type":  "stdio"
+                                       },
+                         "environmentVariables":  [
+                                                      {
+                                                          "name":  "SINOGATE_API_KEY",
+                                                          "description":  "Your SinoGate API key. Chat and comparison calls are billed to this account.",
+                                                          "isRequired":  true,
+                                                          "isSecret":  true,
+                                                          "format":  "string"
+                                                      }
+                                                  ]
+                     }
+                 ]
 }
