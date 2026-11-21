@@ -114,6 +114,8 @@ export type VideoSubmitRequest = {
   resolution?: string
   ratio?: string
   callback_url?: string
+  image_url?: string
+  extra?: Record<string, unknown>
 }
 
 export type VideoJob = {

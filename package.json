@@ -1,6 +1,6 @@
 {
   "name": "@sinogate/mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Use SinoGate chat, image, and video APIs from MCP clients",
   "license": "MIT",
   "type": "module",

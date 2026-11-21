@@ -210,9 +210,13 @@ server.registerTool(
       ratio: z.enum(['16:9', '9:16', '1:1', '4:3', '3:4']).optional().describe('Aspect ratio (default 16:9).'),
       callback_url: z.string().url().max(2048).optional()
         .describe('Optional public HTTPS webhook URL for terminal status. localhost/private networks are rejected by the API.'),
+      image_url: z.string().url().max(2048).optional()
+        .describe('Optional i2v first-frame / reference image (public HTTPS). Required for models whose id contains -i2v.'),
+      extra: z.record(z.string(), z.unknown()).optional()
+        .describe('Optional provider passthrough (bailian allowlist). Unknown keys are rejected by the API.'),
     },
   },
-  async ({ model, prompt, duration, resolution, ratio, callback_url }) => {
+  async ({ model, prompt, duration, resolution, ratio, callback_url, image_url, extra }) => {
     try {
       const job = await client.submitVideo({
         model,
@@ -221,6 +225,8 @@ server.registerTool(
         ...(resolution === undefined ? {} : { resolution }),
         ...(ratio === undefined ? {} : { ratio }),
         ...(callback_url === undefined ? {} : { callback_url }),
+        ...(image_url === undefined ? {} : { image_url }),
+        ...(extra === undefined ? {} : { extra }),
       })
       return jsonResult({
         ...job,
