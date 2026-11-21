@@ -1,16 +1,27 @@
 # SinoGate MCP Server
 
-Use DeepSeek, Kimi (Moonshot), Qwen, GLM, MiniMax, and other models in SinoGate from Claude Desktop, Claude Code, Cursor, Cline, and MCP-compatible clients. Requests use the OpenAI-compatible SinoGate API.
+Use DeepSeek, Kimi (Moonshot), Qwen, GLM, MiniMax, image, and video models in SinoGate from Claude Desktop, Claude Code, Cursor, Cline, and MCP-compatible clients. Requests use the OpenAI-compatible SinoGate API.
 
-Each chat and comparison call uses your own `SINOGATE_API_KEY`. SinoGate bills those requests to your account.
+Each generation call uses your own `SINOGATE_API_KEY`. SinoGate bills those requests to your account.
 
 ## Tools
 
+### Chat
 - `sinogate_chat` — Send a prompt or conversation to one model. Returns the completion and usage information.
-- `sinogate_list_models` — List enabled models, capabilities, and current public USD prices. Filter by provider.
+- `sinogate_list_models` — List enabled models, capabilities, and public USD prices. Filter by `provider` and/or `modality` (`chat` / `image` / `video` / `vision`).
 - `sinogate_compare` — Run one prompt against two to four models in parallel and compare answers, latency, and token usage.
 
-Prices come from SinoGate's public model catalog. The authoritative pricing page is [sinogate.ai/docs/models-pricing](https://sinogate.ai/docs/models-pricing).
+### Image
+- `sinogate_generate_image` — Synchronous text-to-image. Returns temporary URL(s) or base64. SinoGate does not store images (~24h URLs).
+
+### Video (async; no hidden polling)
+- `sinogate_submit_video` — Submit a job; returns `id` immediately. Optional `callback_url` webhook.
+- `sinogate_get_video_status` — Poll status (`queued` → `running` → `succeeded` / `failed` / `expired`).
+- `sinogate_download_video` — When succeeded, return temporary `url` and `content_url`. Does not stream MP4 into the agent context.
+
+**Agent contract:** this server does not wait for video completion and does not auto-resubmit on timeout. The client decides polling and retries.
+
+Prices come from SinoGate's public model catalog. The authoritative pricing page is [sinogate.ai/docs/models-pricing](https://sinogate.ai/docs/models-pricing). OpenAPI for import: [api.sinogate.ai/openapi.json](https://api.sinogate.ai/openapi.json).
 
 ## Requirements
 
@@ -53,7 +64,7 @@ Other stdio MCP clients can launch `npx -y @sinogate/mcp` and provide the enviro
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `SINOGATE_API_KEY` | Yes | — | Your SinoGate API key. Chat and comparison requests are billed to your account. |
+| `SINOGATE_API_KEY` | Yes | — | Your SinoGate API key. Chat, image, and video requests are billed to your account. |
 | `SINOGATE_BASE_URL` | No | `https://api.sinogate.ai/v1` | API base URL. `https://sinogate.ai/v1` is also supported. For local development, HTTP is allowed on localhost. |
 
 The server sends `Authorization: Bearer <key>` only to the configured SinoGate API host. It does not log the key. The list models tool reads public model and pricing data.

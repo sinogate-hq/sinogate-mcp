@@ -2,6 +2,7 @@ export const PRICING_URL = 'https://sinogate.ai/docs/models-pricing'
 export const DEFAULT_BASE_URL = 'https://api.sinogate.ai/v1'
 
 const REQUEST_TIMEOUT_MS = 45_000
+const IMAGE_TIMEOUT_MS = 120_000
 const MAX_RESPONSE_BYTES = 5_000_000
 
 export type ChatMessage = {
@@ -92,6 +93,41 @@ export type ListedModel = {
   pricing_url: string
 }
 
+export type ImageGenerationRequest = {
+  model: string
+  prompt: string
+  n?: number
+  size?: string
+  response_format?: 'url' | 'b64_json'
+}
+
+export type ImageGenerationResponse = {
+  created?: number
+  data?: Array<{ url?: string; b64_json?: string }>
+  [key: string]: unknown
+}
+
+export type VideoSubmitRequest = {
+  model: string
+  prompt: string
+  duration?: number
+  resolution?: string
+  ratio?: string
+  callback_url?: string
+}
+
+export type VideoJob = {
+  id: string
+  status: string
+  model?: string
+  url?: string
+  url_expires_hint?: string
+  error?: unknown
+  created_at?: string
+  updated_at?: string
+  [key: string]: unknown
+}
+
 export class SinoGateClient {
   readonly baseUrl: string
   private readonly apiRoot: URL
@@ -136,7 +172,37 @@ export class SinoGateClient {
     })
   }
 
-  async listModels(provider?: string): Promise<{ models: ListedModel[]; pricingAvailable: boolean }> {
+  async generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
+    return this.requestJson<ImageGenerationResponse>(new URL('/v1/images/generations', this.apiRoot), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}` },
+      body: JSON.stringify(request),
+    }, IMAGE_TIMEOUT_MS)
+  }
+
+  async submitVideo(request: VideoSubmitRequest): Promise<VideoJob> {
+    return this.requestJson<VideoJob>(new URL('/v1/videos', this.apiRoot), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.apiKey}` },
+      body: JSON.stringify(request),
+    })
+  }
+
+  async getVideo(id: string): Promise<VideoJob> {
+    const pathId = encodeURIComponent(id.trim())
+    return this.requestJson<VideoJob>(new URL(`/v1/videos/${pathId}`, this.apiRoot), {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${this.apiKey}` },
+    })
+  }
+
+  /** Absolute URL for GET /v1/videos/{id}/content (agent downloads; this server does not stream MP4). */
+  videoContentUrl(id: string): string {
+    const pathId = encodeURIComponent(id.trim())
+    return new URL(`/v1/videos/${pathId}/content`, this.apiRoot).toString()
+  }
+
+  async listModels(provider?: string, modality?: string): Promise<{ models: ListedModel[]; pricingAvailable: boolean }> {
     const [modelsResponse, catalogResult] = await Promise.all([
       this.requestJson<OpenAiModelsResponse>(new URL('/v1/models', this.apiRoot), { method: 'GET' }),
       this.requestJson<PublicCatalogResponse>(new URL('/admin/models', this.catalogRoot), {
@@ -172,9 +238,15 @@ export class SinoGateClient {
       }
     })
 
-    const filtered = provider?.trim()
-      ? listed.filter((model) => matchesProvider(model, provider.trim()))
-      : listed
+    let filtered = listed
+    if (provider?.trim()) {
+      filtered = filtered.filter((model) => matchesProvider(model, provider.trim()))
+    }
+    if (modality?.trim()) {
+      const needle = modality.trim().toLowerCase()
+      filtered = filtered.filter((model) =>
+        model.modalities.some((item) => item.toLowerCase() === needle))
+    }
 
     return {
       models: filtered,
@@ -182,7 +254,7 @@ export class SinoGateClient {
     }
   }
 
-  private async requestJson<T>(url: URL, init: RequestInit): Promise<T> {
+  private async requestJson<T>(url: URL, init: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
     let response: Response
     try {
       response = await fetch(url, {
@@ -192,12 +264,12 @@ export class SinoGateClient {
           'Content-Type': 'application/json',
           ...init.headers,
         },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
         redirect: 'error',
       })
     } catch (error) {
       if (error instanceof Error && error.name === 'TimeoutError') {
-        throw new Error(`SinoGate API request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`)
+        throw new Error(`SinoGate API request timed out after ${timeoutMs / 1000} seconds.`)
       }
       throw new Error(`Could not reach the SinoGate API: ${messageOf(error)}`)
     }
