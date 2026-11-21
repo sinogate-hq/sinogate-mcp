@@ -3,13 +3,13 @@
   "name": "ai.sinogate/mcp",
   "title": "SinoGate MCP Server",
   "description": "Use SinoGate chat, image, and video APIs from MCP clients.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "websiteUrl": "https://sinogate.ai",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@sinogate/mcp",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "transport": {
         "type": "stdio"
       },
