@@ -13,10 +13,13 @@ Each generation call uses your own `SINOGATE_API_KEY`. SinoGate bills those requ
 
 ### Image
 - `sinogate_generate_image` — Synchronous text-to-image. Returns temporary URL(s) or base64. SinoGate does not store images (~24h URLs).
+- `sinogate_edit_image` — Synchronous reference-image edit (`POST /v1/images/edits`). Accepts data URL or SinoGate asset HTTPS URL (no mask inpainting).
 
 ### Video (async; no hidden polling)
-- `sinogate_submit_video` — Submit a job; returns `id` immediately. Optional `callback_url` webhook.
-- `sinogate_get_video_status` — Poll status (`queued` → `running` → `succeeded` / `failed` / `expired`).
+- `sinogate_submit_video` — Submit a job; returns `id` immediately. Supports optional `callback_url`, `image_url` (i2v), `extra`, and `idempotency_key`.
+- `sinogate_get_video_status` — Poll status (`queued` → `running` → `succeeded` / `failed` / `expired` / `cancelled`).
+- `sinogate_list_videos` — List recent (24h) video jobs with optional `status` filter and pagination.
+- `sinogate_cancel_video` — Cancel an upstream queued (pending) video job and release its credit hold.
 - `sinogate_download_video` — When succeeded, return temporary `url` and `content_url`. Does not stream MP4 into the agent context.
 
 **Agent contract:** this server does not wait for video completion and does not auto-resubmit on timeout. The client decides polling and retries.

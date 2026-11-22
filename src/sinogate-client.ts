@@ -101,6 +101,15 @@ export type ImageGenerationRequest = {
   response_format?: 'url' | 'b64_json'
 }
 
+export type ImageEditRequest = {
+  model: string
+  prompt: string
+  image: string | string[]
+  n?: number
+  size?: string
+  response_format?: 'url' | 'b64_json'
+}
+
 export type ImageGenerationResponse = {
   created?: number
   data?: Array<{ url?: string; b64_json?: string }>
@@ -128,6 +137,13 @@ export type VideoJob = {
   created_at?: string
   updated_at?: string
   [key: string]: unknown
+}
+
+export type VideoListResponse = {
+  data: VideoJob[]
+  page: number
+  page_size: number
+  total: number
 }
 
 export class SinoGateClient {
@@ -182,10 +198,22 @@ export class SinoGateClient {
     }, IMAGE_TIMEOUT_MS)
   }
 
-  async submitVideo(request: VideoSubmitRequest): Promise<VideoJob> {
-    return this.requestJson<VideoJob>(new URL('/v1/videos', this.apiRoot), {
+  async editImage(request: ImageEditRequest): Promise<ImageGenerationResponse> {
+    return this.requestJson<ImageGenerationResponse>(new URL('/v1/images/edits', this.apiRoot), {
       method: 'POST',
       headers: { Authorization: `Bearer ${this.apiKey}` },
+      body: JSON.stringify(request),
+    }, IMAGE_TIMEOUT_MS)
+  }
+
+  async submitVideo(request: VideoSubmitRequest, idempotencyKey?: string): Promise<VideoJob> {
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.apiKey}` }
+    if (idempotencyKey?.trim()) {
+      headers['Idempotency-Key'] = idempotencyKey.trim()
+    }
+    return this.requestJson<VideoJob>(new URL('/v1/videos', this.apiRoot), {
+      method: 'POST',
+      headers,
       body: JSON.stringify(request),
     })
   }
@@ -194,6 +222,25 @@ export class SinoGateClient {
     const pathId = encodeURIComponent(id.trim())
     return this.requestJson<VideoJob>(new URL(`/v1/videos/${pathId}`, this.apiRoot), {
       method: 'GET',
+      headers: { Authorization: `Bearer ${this.apiKey}` },
+    })
+  }
+
+  async listVideos(params?: { status?: string; page?: number; page_size?: number }): Promise<VideoListResponse> {
+    const url = new URL('/v1/videos', this.apiRoot)
+    if (params?.status?.trim()) url.searchParams.set('status', params.status.trim())
+    if (params?.page !== undefined) url.searchParams.set('page', String(params.page))
+    if (params?.page_size !== undefined) url.searchParams.set('page_size', String(params.page_size))
+    return this.requestJson<VideoListResponse>(url, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${this.apiKey}` },
+    })
+  }
+
+  async cancelVideo(id: string): Promise<VideoJob> {
+    const pathId = encodeURIComponent(id.trim())
+    return this.requestJson<VideoJob>(new URL(`/v1/videos/${pathId}`, this.apiRoot), {
+      method: 'DELETE',
       headers: { Authorization: `Bearer ${this.apiKey}` },
     })
   }
