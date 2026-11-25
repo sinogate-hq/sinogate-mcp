@@ -1,5 +1,42 @@
-export const PRICING_URL = 'https://sinogate.ai/docs/models-pricing'
 export const DEFAULT_BASE_URL = 'https://api.sinogate.ai/v1'
+export const DOMESTIC_DEFAULT_BASE_URL = 'https://api.shenkongdu.com/v1'
+export const PRICING_URL = 'https://sinogate.ai/docs/models-pricing'
+export const DOMESTIC_PRICING_URL = 'https://shenkongdu.com/docs/models-pricing'
+
+/** Map API host → public site host that serves /admin/models and docs. */
+const API_TO_SITE_HOST: Record<string, string> = {
+  'api.sinogate.ai': 'sinogate.ai',
+  'sinogate.ai': 'sinogate.ai',
+  'api.shenkongdu.com': 'shenkongdu.com',
+  'shenkongdu.com': 'shenkongdu.com',
+}
+
+export type SiteKind = 'overseas' | 'domestic' | 'custom'
+
+export function siteKindFromHostname(hostname: string): SiteKind {
+  const host = hostname.toLowerCase()
+  if (host === 'api.sinogate.ai' || host === 'sinogate.ai') return 'overseas'
+  if (host === 'api.shenkongdu.com' || host === 'shenkongdu.com') return 'domestic'
+  return 'custom'
+}
+
+export function pricingUrlForHostname(hostname: string): string {
+  return siteKindFromHostname(hostname) === 'domestic' ? DOMESTIC_PRICING_URL : PRICING_URL
+}
+
+export function portalUrlForHostname(hostname: string): string {
+  const kind = siteKindFromHostname(hostname)
+  if (kind === 'domestic') return 'https://shenkongdu.com'
+  if (kind === 'overseas') return 'https://sinogate.ai'
+  return `https://${hostname.replace(/^api\./, '')}`
+}
+
+export function brandLabelForHostname(hostname: string): string {
+  const kind = siteKindFromHostname(hostname)
+  if (kind === 'domestic') return '深空渡'
+  if (kind === 'overseas') return 'SinoGate'
+  return 'API'
+}
 
 const REQUEST_TIMEOUT_MS = 45_000
 const IMAGE_TIMEOUT_MS = 120_000
@@ -148,6 +185,10 @@ export type VideoListResponse = {
 
 export class SinoGateClient {
   readonly baseUrl: string
+  readonly siteKind: SiteKind
+  readonly pricingUrl: string
+  readonly portalUrl: string
+  readonly brandLabel: string
   private readonly apiRoot: URL
   private readonly catalogRoot: URL
   private readonly apiKey: string
@@ -155,31 +196,40 @@ export class SinoGateClient {
   constructor(apiKey: string, configuredBaseUrl = DEFAULT_BASE_URL) {
     this.apiKey = apiKey.trim()
     if (!this.apiKey) {
-      throw new Error('SINOGATE_API_KEY is required. Create an API key at https://sinogate.ai.')
+      throw new Error(
+        'API key is required (SINOGATE_API_KEY or SHENKONGDU_API_KEY). Create one at https://sinogate.ai or https://shenkongdu.com.',
+      )
     }
 
     const parsed = new URL(configuredBaseUrl.trim() || DEFAULT_BASE_URL)
     if (parsed.username || parsed.password || parsed.search || parsed.hash) {
-      throw new Error('SINOGATE_BASE_URL must not contain credentials, a query string, or a fragment.')
+      throw new Error('Base URL must not contain credentials, a query string, or a fragment.')
     }
     const isLocalHttp = parsed.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
     if (parsed.protocol !== 'https:' && !isLocalHttp) {
-      throw new Error('SINOGATE_BASE_URL must use HTTPS (HTTP is allowed for localhost development).')
+      throw new Error('Base URL must use HTTPS (HTTP is allowed for localhost development).')
     }
 
     const path = parsed.pathname.replace(/\/+$/, '')
     if (path !== '' && path !== '/v1') {
-      throw new Error('SINOGATE_BASE_URL must be an API origin or end in /v1, for example https://api.sinogate.ai/v1.')
+      throw new Error(
+        'Base URL must be an API origin or end in /v1, for example https://api.sinogate.ai/v1 or https://api.shenkongdu.com/v1.',
+      )
     }
 
     this.apiRoot = new URL(parsed.origin)
     this.catalogRoot = new URL(parsed.origin)
-    // The production API subdomain intentionally exposes only /v1 routes;
-    // the public priced catalog is served by the main site.
-    if (this.catalogRoot.hostname.toLowerCase() === 'api.sinogate.ai') {
-      this.catalogRoot.hostname = 'sinogate.ai'
+    // Production API subdomains expose only /v1; the priced catalog is on the main site.
+    const apiHost = this.catalogRoot.hostname.toLowerCase()
+    const siteHost = API_TO_SITE_HOST[apiHost]
+    if (siteHost) {
+      this.catalogRoot.hostname = siteHost
     }
     this.baseUrl = `${parsed.origin}/v1`
+    this.siteKind = siteKindFromHostname(apiHost)
+    this.pricingUrl = pricingUrlForHostname(apiHost)
+    this.portalUrl = portalUrlForHostname(apiHost)
+    this.brandLabel = brandLabelForHostname(apiHost)
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
@@ -283,7 +333,7 @@ export class SinoGateClient {
           ...(price.per_image == null ? {} : { per_image: price.per_image }),
           ...(price.billing_expr ? { billing_expr: price.billing_expr } : {}),
         } : null,
-        pricing_url: PRICING_URL,
+        pricing_url: this.pricingUrl,
       }
     })
 
@@ -304,6 +354,7 @@ export class SinoGateClient {
   }
 
   private async requestJson<T>(url: URL, init: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<T> {
+    const label = this.brandLabel
     let response: Response
     try {
       response = await fetch(url, {
@@ -318,19 +369,19 @@ export class SinoGateClient {
       })
     } catch (error) {
       if (error instanceof Error && error.name === 'TimeoutError') {
-        throw new Error(`SinoGate API request timed out after ${timeoutMs / 1000} seconds.`)
+        throw new Error(`${label} API request timed out after ${timeoutMs / 1000} seconds.`)
       }
-      throw new Error(`Could not reach the SinoGate API: ${messageOf(error)}`)
+      throw new Error(`Could not reach the ${label} API: ${messageOf(error)}`)
     }
 
     const contentLength = Number(response.headers.get('content-length') || 0)
     if (contentLength > MAX_RESPONSE_BYTES) {
-      throw new Error('SinoGate API response exceeded the 5 MB safety limit.')
+      throw new Error(`${label} API response exceeded the 5 MB safety limit.`)
     }
 
     const text = await response.text()
     if (Buffer.byteLength(text, 'utf8') > MAX_RESPONSE_BYTES) {
-      throw new Error('SinoGate API response exceeded the 5 MB safety limit.')
+      throw new Error(`${label} API response exceeded the 5 MB safety limit.`)
     }
 
     let body: unknown
@@ -342,7 +393,7 @@ export class SinoGateClient {
 
     if (!response.ok) {
       const apiMessage = getApiErrorMessage(body).replaceAll(this.apiKey, '[redacted]')
-      throw new Error(`SinoGate API returned HTTP ${response.status}${apiMessage ? `: ${apiMessage}` : '.'}`)
+      throw new Error(`${label} API returned HTTP ${response.status}${apiMessage ? `: ${apiMessage}` : '.'}`)
     }
     return body as T
   }

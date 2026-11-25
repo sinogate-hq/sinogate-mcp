@@ -1,7 +1,7 @@
 {
   "name": "@sinogate/mcp",
-  "version": "0.2.1",
-  "description": "Use SinoGate chat, image, and video APIs from MCP clients",
+  "version": "0.2.2",
+  "description": "Use SinoGate / 深空渡 chat, image, and video APIs from MCP clients",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -33,6 +33,7 @@
     "mcp",
     "model-context-protocol",
     "sinogate",
+    "shenkongdu",
     "openai-compatible",
     "llm",
     "deepseek",

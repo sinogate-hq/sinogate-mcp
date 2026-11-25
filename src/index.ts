@@ -5,17 +5,31 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio'
 import { z } from 'zod'
 import {
   DEFAULT_BASE_URL,
+  DOMESTIC_DEFAULT_BASE_URL,
   messageOf,
   SinoGateClient,
   type ChatMessage,
   type ChatRequest,
 } from './sinogate-client.js'
 
-const apiKey = process.env.SINOGATE_API_KEY?.trim() ?? ''
-const baseUrl = process.env.SINOGATE_BASE_URL?.trim() || DEFAULT_BASE_URL
+const apiKey =
+  process.env.SINOGATE_API_KEY?.trim()
+  || process.env.SHENKONGDU_API_KEY?.trim()
+  || ''
+const explicitBaseUrl =
+  process.env.SINOGATE_BASE_URL?.trim()
+  || process.env.SHENKONGDU_BASE_URL?.trim()
+  || ''
+// Prefer domestic API when only a 深空渡 key is provided.
+const baseUrl = explicitBaseUrl
+  || (process.env.SHENKONGDU_API_KEY?.trim() && !process.env.SINOGATE_API_KEY?.trim()
+    ? DOMESTIC_DEFAULT_BASE_URL
+    : DEFAULT_BASE_URL)
 
 if (!apiKey) {
-  console.error('SinoGate MCP requires SINOGATE_API_KEY. Set it in your MCP client configuration.')
+  console.error(
+    'MCP requires SINOGATE_API_KEY or SHENKONGDU_API_KEY. Set it in your MCP client configuration.',
+  )
   process.exit(1)
 }
 
@@ -43,7 +57,7 @@ const chatOptions = {
 function createServer() {
   const server = new McpServer({
     name: 'sinogate-mcp',
-    version: '0.2.1',
+    version: '0.2.2',
   })
   registerTools(server)
   return server
@@ -53,10 +67,10 @@ function registerTools(server: McpServer) {
 server.registerTool(
   'sinogate_chat',
   {
-    title: 'Chat with a SinoGate model',
-    description: 'Send a prompt or conversation to a SinoGate model such as DeepSeek, Kimi, Qwen, GLM, or MiniMax. Uses the configured SinoGate API key and returns the answer and token usage.',
+    title: 'Chat with a model',
+    description: 'Send a prompt or conversation to a SinoGate / 深空渡 model such as DeepSeek, Kimi, Qwen, GLM, or MiniMax. Uses the configured API key and returns the answer and token usage.',
     inputSchema: {
-      model: z.string().min(1).max(256).describe('SinoGate model ID from sinogate_list_models, for example qwen3.7-plus.'),
+      model: z.string().min(1).max(256).describe('Model ID from sinogate_list_models, for example qwen3.7-plus.'),
       prompt: z.string().min(1).max(100_000).optional().describe('A single user prompt. Use this or messages.'),
       messages: z.array(messageSchema).min(1).max(100).optional().describe('Conversation messages. Use this or prompt.'),
       ...chatOptions,
@@ -87,8 +101,8 @@ server.registerTool(
 server.registerTool(
   'sinogate_list_models',
   {
-    title: 'List SinoGate models and prices',
-    description: 'List currently available SinoGate models, modalities, thinking support, and public USD prices. Optionally filter by provider (deepseek, kimi, qwen, glm, minimax) and/or modality (chat, image, video, vision). Prices link to the official pricing page.',
+    title: 'List models and prices',
+    description: 'List currently available SinoGate / 深空渡 models, modalities, thinking support, and public prices. Optionally filter by provider (deepseek, kimi, qwen, glm, minimax) and/or modality (chat, image, video, vision). Prices link to the official pricing page for the configured site.',
     inputSchema: {
       provider: z.string().min(1).max(64).optional().describe('Optional provider filter, for example qwen or deepseek.'),
       modality: z.enum(['chat', 'image', 'video', 'vision']).optional()
@@ -101,7 +115,7 @@ server.registerTool(
       return jsonResult({
         ...result,
         ...(result.pricingAvailable ? {} : {
-          pricingNote: 'The public price feed could not be loaded. Check current prices at https://sinogate.ai/docs/models-pricing.',
+          pricingNote: `The public price feed could not be loaded. Check current prices at ${client.pricingUrl}.`,
         }),
       })
     } catch (error) {
@@ -113,11 +127,11 @@ server.registerTool(
 server.registerTool(
   'sinogate_compare',
   {
-    title: 'Compare SinoGate models',
-    description: 'Run the same prompt against 2 to 4 SinoGate model IDs in parallel. Returns each answer, latency, and token usage; calls are billed to the configured account.',
+    title: 'Compare models',
+    description: 'Run the same prompt against 2 to 4 model IDs in parallel. Returns each answer, latency, and token usage; calls are billed to the configured account.',
     inputSchema: {
       prompt: z.string().min(1).max(100_000).describe('Prompt to send unchanged to each model.'),
-      models: z.array(z.string().min(1).max(256)).min(2).max(4).describe('Two to four SinoGate model IDs.'),
+      models: z.array(z.string().min(1).max(256)).min(2).max(4).describe('Two to four model IDs.'),
       ...chatOptions,
     },
   },
@@ -167,7 +181,7 @@ server.registerTool(
   'sinogate_generate_image',
   {
     title: 'Generate an image',
-    description: 'Synchronous text-to-image via SinoGate (OpenAI-compatible). Returns temporary image URL(s) or base64. SinoGate does not store images — download promptly (~24h). Does not poll or retry on failure.',
+    description: 'Synchronous text-to-image via SinoGate / 深空渡 (OpenAI-compatible). Returns temporary image URL(s) or base64. Images are not stored — download promptly (~24h). Does not poll or retry on failure.',
     inputSchema: {
       model: z.string().min(1).max(256).describe('Image model ID (modalities includes image), for example qwen-image-3.0.'),
       prompt: z.string().min(1).max(10_000).describe('Image description (Chinese or English).'),
@@ -201,12 +215,12 @@ server.registerTool(
   'sinogate_edit_image',
   {
     title: 'Edit an image with reference image(s)',
-    description: 'Synchronous image-to-image / reference-image edit via POST /v1/images/edits. Requires at least one reference image (data URL or SinoGate asset HTTPS URL). Classic mask inpainting is not supported. Use models such as wan2.7-image, qwen-image-3.0, or qwen-image-2.1.',
+    description: 'Synchronous image-to-image / reference-image edit via POST /v1/images/edits. Requires at least one reference image (data URL or platform asset HTTPS URL). Classic mask inpainting is not supported. Use models such as wan2.7-image, qwen-image-3.0, or qwen-image-2.1.',
     inputSchema: {
       model: z.string().min(1).max(256).describe('Image model ID that accepts reference images, e.g. qwen-image-3.0 or wan2.7-image.'),
       prompt: z.string().min(1).max(10_000).describe('Edit instruction (Chinese or English).'),
       image: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)])
-        .describe('Reference image data URL (image/jpeg|png|webp|bmp) or SinoGate asset HTTPS URL; array for multi-ref models.'),
+        .describe('Reference image data URL (image/jpeg|png|webp|bmp) or platform asset HTTPS URL; array for multi-ref models.'),
       n: z.number().int().min(1).max(4).optional().describe('Number of images (default 1).'),
       size: z.string().min(3).max(32).optional().describe('Size such as 1024x1024 or 1024*1024.'),
       response_format: z.enum(['url', 'b64_json']).optional().describe('url (default) or b64_json.'),
@@ -345,7 +359,7 @@ server.registerTool(
   'sinogate_download_video',
   {
     title: 'Get video download URLs',
-    description: 'When the job has succeeded, return the temporary upstream MP4 url and the SinoGate content proxy URL. Does not stream binary into the agent context (files are large). If not ready, returns current status without waiting.',
+    description: 'When the job has succeeded, return the temporary upstream MP4 url and the content proxy URL. Does not stream binary into the agent context (files are large). If not ready, returns current status without waiting.',
     inputSchema: {
       id: z.string().min(1).max(128).describe('Video job id (vid_…).'),
     },
@@ -369,7 +383,7 @@ server.registerTool(
         url: job.url,
         url_expires_hint: job.url_expires_hint ?? 'Temporary URL; download promptly.',
         content_url: client.videoContentUrl(id),
-        note: 'Prefer url for direct download, or content_url with the same Bearer API key. SinoGate does not store the file.',
+        note: 'Prefer url for direct download, or content_url with the same Bearer API key. The platform does not store the file.',
       })
     } catch (error) {
       return errorResult(messageOf(error))

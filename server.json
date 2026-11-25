@@ -1,24 +1,45 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "ai.sinogate/mcp",
-  "title": "SinoGate MCP Server",
-  "description": "Use SinoGate chat, image, and video APIs from MCP clients.",
-  "version": "0.2.1",
+  "title": "SinoGate / 深空渡 MCP Server",
+  "description": "Use SinoGate or 深空渡 chat, image, and video APIs from MCP clients.",
+  "version": "0.2.2",
   "websiteUrl": "https://sinogate.ai",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@sinogate/mcp",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
           "name": "SINOGATE_API_KEY",
-          "description": "Your SinoGate API key. Chat, image, and video calls are billed to this account.",
-          "isRequired": true,
+          "description": "Overseas SinoGate API key. Chat, image, and video calls are billed to this account. For 深空渡 you may use SHENKONGDU_API_KEY instead.",
+          "isRequired": false,
           "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "SHENKONGDU_API_KEY",
+          "description": "Domestic 深空渡 API key. When set without SINOGATE_API_KEY, defaults to https://api.shenkongdu.com/v1.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "SINOGATE_BASE_URL",
+          "description": "Optional API base URL. Defaults to https://api.sinogate.ai/v1 (or domestic when only SHENKONGDU_API_KEY is set).",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        },
+        {
+          "name": "SHENKONGDU_BASE_URL",
+          "description": "Optional alias for SINOGATE_BASE_URL (e.g. https://api.shenkongdu.com/v1).",
+          "isRequired": false,
+          "isSecret": false,
           "format": "string"
         }
       ]
